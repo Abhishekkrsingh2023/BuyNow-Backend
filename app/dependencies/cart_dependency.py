@@ -34,41 +34,43 @@ async def add_to_cart_dependency(cart:CartItem, token: dict = Depends(authentica
     return {"success": True, "message": "Product added to cart successfully"}
 
 async def get_products_in_cart(token: dict = Depends(authenticate_user)):
-
     user_id = token.get("id")
 
     cart = await Carts.find_one(Carts.user.id == BeanieObjectId(user_id))
     if not cart or not cart.items:
         return {"success": True, "cart": []}
-    
+
+    # work entirely with ObjectIds
     product_ids = [item.productId for item in cart.items]
 
-    if not product_ids:
-        return {"success": True, "cart": []}
-    
+    # fetch all products with one query
     products = await Products.find(
         In(Products.id, product_ids)
     ).to_list()
 
     if not products:
         return {"success": True, "cart": []}
-    # Create a mapping of product IDs to product details for easy lookup
-    product_map = {str(product.id): product for product in products}
+
+    # map using ObjectId keys (no string conversion)
+    product_map = {product.id: product for product in products}
 
     cart_with_products = []
     for item in cart.items:
-        product = product_map.get(str(item.productId))
+        product = product_map.get(item.productId)
         if product:
-            # Don't mutate the Beanie Document in-place; instead, serialize and exclude fields.
-            product_data = product.model_dump(by_alias=True, exclude={"sellerID", "quantity"})
-            product_data["_id"] = str(product.id)
+            pd = product.model_dump(
+                exclude=["sellerID", "quantity", "_id", "description", "createdAt", "updatedAt"]
+            )
+            pd["id"] = str(product.id)
 
             cart_with_products.append({
-                "product": product_data,
+                "product": pd,
                 "quantity": item.quantity
             })
 
     return {"success": True, "cart": cart_with_products}
+
+
 
 async def remove_from_cart_dependency(product_id: BeanieObjectId, token: dict = Depends(authenticate_user)):
 

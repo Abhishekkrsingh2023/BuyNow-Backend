@@ -95,4 +95,4 @@ async def verify_payment_signature(data: PaymentVerificationSchema):
                 "payment_id": data.razorpay_payment_id
             }
         })
-    return {"payment_id": data.razorpay_payment_id, "status": "verified"}
+    return {"success": True, "payment_id": data.razorpay_payment_id, "status": "verified"}

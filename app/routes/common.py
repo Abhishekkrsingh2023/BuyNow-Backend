@@ -8,10 +8,6 @@ from app.dependencies.user_dependency import (
     get_user_logout_dependency,
 )
 
-from app.dependencies.common_dependency import (
-    get_verification_code_dependency,
-)
-
 router = APIRouter(
     prefix="/user",
     tags=["common"],
@@ -20,10 +16,6 @@ router = APIRouter(
 @router.get("/me", status_code=status.HTTP_200_OK)
 async def get_user_profile(current_user= Depends(get_current_user_dependency)):
     return current_user
-
-@router.get("/send-verification-code",status_code=status.HTTP_201_CREATED)
-def get_verification_code(message=Depends(get_verification_code_dependency)):
-    return {"message":"Verification code sent successfully"}
 
 @router.post("/login",status_code=status.HTTP_200_OK)
 async def login_user(user = Depends(login_user_dependency)):

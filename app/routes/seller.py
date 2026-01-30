@@ -22,7 +22,7 @@ async def create_seller(message = Depends(create_seller_dependency)):
 async def create_product(result = Depends(create_product_dependency)):
     return result
 
-@router.get("/dashboard", status_code=status.HTTP_200_OK)
+@router.get("/products", status_code=status.HTTP_200_OK)
 async def seller_dashboard(products = Depends(get_product_dependency)):
     return products
     

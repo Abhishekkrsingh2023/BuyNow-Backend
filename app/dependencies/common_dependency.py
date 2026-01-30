@@ -18,4 +18,4 @@ async def get_verification_code_dependency(email: str, background_tasks: Backgro
 
     background_tasks.add_task(send_message_dependency,{"email": email,"name":user.firstName},otp)
 
-    return {"message": f"Verification code sent to {email}"}
+    return {"success": True, "message": f"Verification code sent to {email}"}

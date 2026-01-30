@@ -1,14 +1,26 @@
 
-from fastapi import Depends, HTTPException, Response,BackgroundTasks
+import os,uuid
 
-from app.schemas.login_schema import Login,OTPVerification
-# from app.schemas.user_schema import UserCreate, UserUpdate
+from fastapi import (
+    Depends, 
+    File,
+    UploadFile,
+    HTTPException, 
+    Response,
+    BackgroundTasks,
+    status
+)
 
-# from app.database.collections import UserSchema
-
+from app.schemas.login_schema import Login
 
 from app.auth_dependency import authenticate_user
-from app.schemas import Users, CreateUser,Addresses,Carts,UpdateUser
+from app.schemas import (
+    Users, 
+    CreateUser,
+    Addresses,
+    Carts,
+    UpdateUser
+)
 
 from app.core import (
     create_access_token,
@@ -18,15 +30,23 @@ from app.core import (
 
 from app.config.settings import settings
 
-from app.utils import get_current_timestamp
+from app.utils import (
+    send_message_dependency,
+    random_code_gen,
+    get_current_timestamp,
+    upload_file_to_cloudinary,
+    delete_file_from_cloudinary
+)
 
-from app.utils import send_message_dependency
-from app.utils import random_code_gen
+
+EXCLUDE_FIELDS = ["password", "verificationCode", "_id","cartId","addressId","avatarId"]
+
 
 async def create_user_dependency(user: CreateUser, background_tasks: BackgroundTasks):
+
     existing_user = await Users.find_one(Users.email == user.email)
     if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
     user.password = await hash_password(user.password)
     otp = random_code_gen.generate_random_otp()
@@ -50,31 +70,11 @@ async def create_user_dependency(user: CreateUser, background_tasks: BackgroundT
         otp
     )
 
-    del new_user.password
-    del new_user.verificationCode
+    user_response = new_user.model_dump(exclude=EXCLUDE_FIELDS)
+    user_response["id"] = str(new_user.id)
 
-    return {"message": "success", "user": new_user}
+    return {"success": True, "user": user_response}
 
-
-async def verify_user_dependency(otp_verification: OTPVerification, response: Response):
-    user = await Users.find_one(Users.email == otp_verification.email)
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    if user.isVerified:
-        response.status_code = 200
-        return {"message": "User already verified"}
-
-    if user.verificationCode != otp_verification.otp:
-        raise HTTPException(status_code=400, detail="Invalid verification code")
-    
-    user.isVerified = True
-    user.verificationCode = None
-    await user.save()
-    response.status_code = 200
-
-    return {"message": "User verified successfully"}
 
 
 async def get_current_user_dependency(payload=Depends(authenticate_user)):
@@ -84,10 +84,10 @@ async def get_current_user_dependency(payload=Depends(authenticate_user)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # removing password before returning user
-    del user.password
+    user_response:dict = user.model_dump(exclude=EXCLUDE_FIELDS)
+    user_response["id"] = str(user.id)
 
-    return user
+    return {"success": True, "user": user_response}
 
 
 async def update_user_dependency(user_update: UpdateUser, payload:dict=Depends(authenticate_user)):
@@ -112,11 +112,10 @@ async def update_user_dependency(user_update: UpdateUser, payload:dict=Depends(a
     update_values["updatedAt"] = get_current_timestamp()
     await user.update({"$set": update_values})
 
-    del user.password
-    del user.verificationCode
+    user_response:dict = user.model_dump(exclude=EXCLUDE_FIELDS)
+    user_response["id"] = str(user.id)
 
-    return user
-
+    return {"success": True, "user": user_response}
 
 
 async def delete_user_dependency(token: dict = Depends(authenticate_user)):
@@ -142,7 +141,7 @@ async def delete_user_dependency(token: dict = Depends(authenticate_user)):
     # delete user
     await user.delete()
 
-    return {"message": "success"}
+    return {"success": True, "message": "User deleted successfully"}
 
 
 
@@ -165,12 +164,13 @@ async def login_user_dependency(user: Login, response: Response):
         expires=60 * settings.ACCESS_TOKEN_EXPIRE_MINUTES,
         path="/",
         secure=True,
-        samesite="strict",
+        samesite="none",
     )
 
-    del existing_user.password
+    user_response:dict = existing_user.model_dump(exclude=EXCLUDE_FIELDS)
+    user_response["id"] = str(existing_user.id)
 
-    return {"success": True, "message": existing_user}
+    return {"success": True, "message": user_response}
 
 
 async def get_user_logout_dependency(response: Response, token: dict = Depends(authenticate_user)):
@@ -178,9 +178,91 @@ async def get_user_logout_dependency(response: Response, token: dict = Depends(a
         key="access_token",
         path="/",
         secure=True,
-        samesite="strict",
+        samesite="none",
         httponly=True,
     )
     
     return {"success": True, "message": "User logged out successfully"}
 
+async def update_user_avatar(image:UploadFile=File(...), payload:dict=Depends(authenticate_user)):
+    user_id = payload.get("id")
+    user = await Users.get(user_id)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    avatar_id = user.avatarId
+    # extracting the extension
+    if image.filename:
+        _, ext = os.path.splitext(image.filename)
+        suffix = ext or ""
+
+    temp_path = None
+
+    try:
+        os.makedirs("temp", exist_ok=True)
+        temp_id = str(uuid.uuid4())
+        temp_filename = f"{temp_id}{suffix}"
+        temp_path = os.path.join("temp", temp_filename)
+
+        with open(temp_path, "wb") as tmp:
+            tmp.write(await image.read())
+
+        upload_result = upload_file_to_cloudinary(file_path=temp_path, public_id=temp_id, folder="user_avatars")
+
+        if upload_result:
+            user.avatarUrl = upload_result.get("secure_url")
+            user.avatarId = upload_result.get("public_id")
+        else:
+            raise Exception("Unable to upload image")
+        
+    except Exception:
+        raise HTTPException(status_code=500, detail="Unable to upload avatar")
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove("temp")
+            except Exception as e:
+                pass
+
+    if avatar_id:
+        try:
+            data = await delete_file_from_cloudinary(public_id=avatar_id, resource_type="image")
+        except Exception as e:
+            pass  
+
+
+    user.updatedAt = get_current_timestamp()
+    await user.save()
+
+    user_response:dict = user.model_dump(exclude=["password", "verificationCode", "_id","cartId","addressId","avatarId"])
+    user_response["id"] = str(user.id)
+
+    return {"success": True, "user": user_response}
+
+async def remove_user_avatar(payload:dict=Depends(authenticate_user)):
+    user_id = payload.get("id")
+    user = await Users.get(user_id)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    avatar_id = user.avatarId
+
+    if not avatar_id:
+        raise HTTPException(status_code=400, detail="No avatar to remove")
+
+    try:
+        data = await delete_file_from_cloudinary(public_id=avatar_id, resource_type="image")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Unable to delete avatar from cloud storage")  
+
+    user.avatarUrl = None
+    user.avatarId = None
+    user.updatedAt = get_current_timestamp()
+    await user.save()
+
+    user_response:dict = user.model_dump(exclude=EXCLUDE_FIELDS)
+    user_response["id"] = str(user.id)
+
+    return {"success": True, "user": user_response}

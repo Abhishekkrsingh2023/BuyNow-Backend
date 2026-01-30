@@ -54,6 +54,7 @@ async def _upload_one_image(image: UploadFile) -> dict | None:
             "url": upload_result.get("secure_url"),
             "imgId": upload_result.get("public_id"),
         }
+    
     finally:
         if temp_path and os.path.exists(temp_path):
             try:
@@ -104,7 +105,10 @@ async def create_product_dependency(
     )
 
     await new_product.insert()
-    return {"message": "success", "product": new_product}
+
+    product_response = new_product.model_dump(exclude=["sellerID","_id","createdAt","updatedAt"])
+    product_response["id"] = str(new_product.id)
+    return {"message": "success", "product": product_response}
 
 async def get_product_dependency(
     token: dict = Depends(authenticate_user),
@@ -116,31 +120,41 @@ async def get_product_dependency(
         raise HTTPException(status_code=403, detail="Operation forbidden: Sellers only")
 
     seller_oid = BeanieObjectId(seller_id)
-    products = await Products.find(Products.sellerID.id == seller_oid).to_list()
-    return products
+    products = Products.find_many(Products.sellerID.id == seller_oid).sort(-Products.createdAt)
 
+    product_responses = []
+    async for prod in products:
+        prod_dict = prod.model_dump(exclude=["sellerID","_id","createdAt","updatedAt"])
+        prod_dict["id"] = str(prod.id)
+        product_responses.append(prod_dict)
+
+    return product_responses
 
 async def get_random_products_dependency(limit: int = 10):
+
     limit = max(1, int(limit))
 
     pipeline = [
+        {"$match": {"in_stock": True}},
+        {"$sample": {"size": limit}},
+
+        # Add computed field first
+        {"$addFields": {"id": {"$toString": "$_id"}}},
+
+        # projection to exclude unwanted fields
         {
-            "$match": {"in_stock": True}
+            "$project": {
+                "_id": 0,
+                "createdAt": 0,
+                "updatedAt": 0,
+                "sellerID": 0,
+            }
         },
-        {
-            "$sample": {"size": limit}
-        }
     ]
 
     collection = Products.get_pymongo_collection()
     cursor = collection.aggregate(pipeline)
-    products = await cursor.to_list(length=limit)
-
-    # handling IDs
-    for p in products:
-        p["id"] = str(p.pop("_id"))
-        sellerID = str(p["sellerID"].id)
-        p["sellerID"] = sellerID
+    products = await cursor.to_list()
 
     return products
 
@@ -149,4 +163,7 @@ async def get_product_by_id_dependency(id: BeanieObjectId):
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    return product
+    product_dict:dict = product.model_dump(exclude=["_id","sellerID","createdAt","updatedAt"])
+    product_dict["id"] = str(product.id)
+
+    return product_dict
