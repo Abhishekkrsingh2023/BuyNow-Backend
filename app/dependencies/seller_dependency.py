@@ -1,0 +1,36 @@
+from fastapi import HTTPException,status,BackgroundTasks
+
+from app.utils import generate_random_otp,send_message_dependency
+
+from app.schemas import CreateUser, Users
+
+from app.core import hash_password
+
+
+async def create_seller_dependency(seller: CreateUser, background_tasks: BackgroundTasks):
+    
+    existing_user = await Users.find_one(Users.email == seller.email)
+
+    if existing_user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+    
+    seller.password = await hash_password(seller.password)
+
+    otp = generate_random_otp()
+    
+    background_tasks.add_task(
+        send_message_dependency,
+        receiver={"email": seller.email, "name": seller.firstName}, otp=otp
+    )
+    new_seller = Users(**seller.model_dump(by_alias=True), verificationCode=otp)
+    new_seller.role = "seller"
+
+    await new_seller.insert()
+
+    del new_seller.password
+    del new_seller.verificationCode
+
+
+    return {"success": True, "message": new_seller}
+
+
