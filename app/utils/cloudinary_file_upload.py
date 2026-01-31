@@ -70,5 +70,5 @@ async def delete_file_from_cloudinary(public_id: str, resource_type: str = "imag
             resource_type=resource_type,
         )
         return delete_result
-    except Exception as e:
-        print("An error occurred during deletion:", str(e))
+    except Exception:
+        pass

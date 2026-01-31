@@ -250,7 +250,7 @@ async def get_user_logout_dependency(response: Response, token: dict = Depends(a
     
     return {"success": True, "message": "User logged out successfully"}
 
-async def update_user_avatar(image:UploadFile=File(...), payload:dict=Depends(authenticate_user)):
+async def update_user_avatar(image:UploadFile=File(...), payload:dict=Depends(authenticate_user), background_tasks:BackgroundTasks=None):
     """
     Docstring for update_user_avatar
     
@@ -258,6 +258,8 @@ async def update_user_avatar(image:UploadFile=File(...), payload:dict=Depends(au
     :type image: UploadFile
     :param payload: Description: The decoded JWT payload containing user information.
     :type payload: dict
+    :param background_tasks: Description: The BackgroundTasks object to handle background tasks.
+    :type background_tasks: BackgroundTasks
     """
     user_id = payload.get("id")
     user = await Users.get(user_id)
@@ -299,12 +301,10 @@ async def update_user_avatar(image:UploadFile=File(...), payload:dict=Depends(au
             except Exception:
                 pass
 
-    if avatar_id:
-        try:
-            data = await delete_file_from_cloudinary(public_id=avatar_id, resource_type="image")
-        except Exception:
-            pass  
-
+    if avatar_id and background_tasks:
+        background_tasks.add_task(delete_file_from_cloudinary, public_id=avatar_id, resource_type="image")
+    elif avatar_id:
+        await delete_file_from_cloudinary(public_id=avatar_id, resource_type="image")
 
     user.updatedAt = get_current_timestamp()
     await user.save()
@@ -314,7 +314,7 @@ async def update_user_avatar(image:UploadFile=File(...), payload:dict=Depends(au
 
     return {"success": True, "user": user_response}
 
-async def remove_user_avatar(payload:dict=Depends(authenticate_user)):
+async def remove_user_avatar(payload:dict=Depends(authenticate_user), background_tasks:BackgroundTasks=None):
     """
     Docstring for remove_user_avatar
     
@@ -332,10 +332,10 @@ async def remove_user_avatar(payload:dict=Depends(authenticate_user)):
     if not avatar_id:
         raise HTTPException(status_code=400, detail="No avatar to remove")
 
-    try:
+    if background_tasks:
+        background_tasks.add_task(delete_file_from_cloudinary, public_id=avatar_id, resource_type="image")
+    else:
         await delete_file_from_cloudinary(public_id=avatar_id, resource_type="image")
-    except Exception:
-        raise HTTPException(status_code=500, detail="Unable to delete avatar from cloud storage")  
 
     user.avatarUrl = None
     user.avatarId = None
