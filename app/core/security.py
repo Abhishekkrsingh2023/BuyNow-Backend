@@ -23,7 +23,7 @@ async def create_access_token(data: dict, expires_delta: Optional[timedelta] = N
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.JWT_ACCESS_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
 async def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -43,21 +43,37 @@ async def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = 
     else:
         expire = datetime.now(timezone.utc) + timedelta(days=30)  # Default 30 days for refresh token
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.JWT_REFRESH_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
 # verifies the JWT token
 async def verify_access_token(token: str) -> dict:
     """
-    verify_access_token
+    verify_access_token verifies the JWT access token
     
-    :param token: Description
+    :param token: Description: JWT token to be verified
     :type token: str
-    :return: Description
+    :return: Description: payload extracted from the token if valid
     :rtype: dict
     """
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(token, settings.JWT_ACCESS_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        return payload
+    # incase of invalid token
+    except PyJWTError as e:
+        return None
+
+async def verify_refresh_token(token: str) -> dict:
+    """
+    verify_refresh_token verifies the JWT refresh token
+    
+    :param token: Description: JWT refresh token to be verified
+    :type token: str
+    :return: Description: payload extracted from the token if valid
+    :rtype: dict
+    """
+    try:
+        payload = jwt.decode(token, settings.JWT_REFRESH_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         return payload
     # incase of invalid token
     except PyJWTError as e:

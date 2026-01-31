@@ -7,7 +7,8 @@ class Settings(BaseSettings):
     # Database settings
     MONGO_URL: str = Field(..., env="MONGO_URL")
     DATABASE_NAME: str = Field("ecommerce_db", env="DATABASE_NAME")
-    JWT_SECRET_KEY: str = Field(..., env="JWT_SECRET_KEY")
+    JWT_ACCESS_SECRET_KEY: str = Field(..., env="JWT_ACCESS_SECRET_KEY")
+    JWT_REFRESH_SECRET_KEY: str = Field(..., env="JWT_REFRESH_SECRET_KEY")
     JWT_ALGORITHM: str = Field("HS256", env="JWT_ALGORITHM")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60, env="ACCESS_TOKEN_EXPIRE_MINUTES")
 

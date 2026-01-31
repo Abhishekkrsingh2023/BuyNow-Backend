@@ -19,5 +19,5 @@ async def get_database() -> AsyncIOMotorClient:
             document_models=[Users, Carts, Products, Addresses, Orders],
         )
         return client
-    except Exception as e:
+    except Exception:
         raise Exception("Database connection failed......")

@@ -1,4 +1,3 @@
-
 import os,uuid
 
 from fastapi import (
@@ -13,7 +12,11 @@ from fastapi import (
 
 from app.schemas.login_schema import Login
 
-from app.auth_dependency import authenticate_user
+from app.auth_dependency import (
+    authenticate_user,
+    auth_refresh_token
+)
+
 from app.schemas import (
     Users, 
     CreateUser,
@@ -24,6 +27,7 @@ from app.schemas import (
 
 from app.core import (
     create_access_token,
+    create_refresh_token,
     hash_password,
     verify_password,
 )
@@ -35,7 +39,9 @@ from app.utils import (
     random_code_gen,
     get_current_timestamp,
     upload_file_to_cloudinary,
-    delete_file_from_cloudinary
+    delete_file_from_cloudinary,
+    set_cookie, 
+    delete_cookie,
 )
 
 
@@ -43,6 +49,14 @@ EXCLUDE_FIELDS = ["password", "verificationCode", "_id","cartId","addressId","av
 
 
 async def create_user_dependency(user: CreateUser, background_tasks: BackgroundTasks):
+    """
+    Docstring for create_user_dependency
+    
+    :param user: Description: The CreateUser schema containing user registration details.
+    :type user: CreateUser
+    :param background_tasks: Description: The BackgroundTasks object to handle background tasks.
+    :type background_tasks: BackgroundTasks
+    """
 
     existing_user = await Users.find_one(Users.email == user.email)
     if existing_user:
@@ -78,6 +92,11 @@ async def create_user_dependency(user: CreateUser, background_tasks: BackgroundT
 
 
 async def get_current_user_dependency(payload=Depends(authenticate_user)):
+    """
+    get_current_user_dependency
+    
+    :param payload: Description: The decoded JWT payload containing user information.
+    """
     user_id = payload.get("id")
 
     user = await Users.get(user_id)
@@ -91,6 +110,14 @@ async def get_current_user_dependency(payload=Depends(authenticate_user)):
 
 
 async def update_user_dependency(user_update: UpdateUser, payload:dict=Depends(authenticate_user)):
+    """
+    update_user_dependency
+    
+    :param user_update: Description: The UpdateUser schema containing the fields to be updated.
+    :type user_update: UpdateUser
+    :param payload: Description: The decoded JWT payload containing user information.
+    :type payload: dict
+    """
     
     user_id = payload.get("id")
     user = await Users.get(user_id)
@@ -119,6 +146,12 @@ async def update_user_dependency(user_update: UpdateUser, payload:dict=Depends(a
 
 
 async def delete_user_dependency(token: dict = Depends(authenticate_user)):
+    """
+    delete_user_dependency
+    
+    :param token: Description: The decoded JWT payload containing user information.
+    :type token: dict
+    """
     user_id = token.get("id")
     role = token.get("role")
 
@@ -146,6 +179,14 @@ async def delete_user_dependency(token: dict = Depends(authenticate_user)):
 
 
 async def login_user_dependency(user: Login, response: Response):
+    """
+    Docstring for login_user_dependency
+    
+    :param user: Description: The Login schema containing user credentials.
+    :type user: Login
+    :param response: Description: The Response object to set cookies.
+    :type response: Response
+    """
     
     existing_user = await Users.find_one(Users.email == user.email)
 
@@ -155,17 +196,15 @@ async def login_user_dependency(user: Login, response: Response):
     if not await verify_password(user.password, existing_user.password):
         raise HTTPException(status_code=400, detail="Invalid email or password")
 
-    token = await create_access_token({"id": str(existing_user.id), "role": existing_user.role})
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        max_age=60 * settings.ACCESS_TOKEN_EXPIRE_MINUTES,
-        expires=60 * settings.ACCESS_TOKEN_EXPIRE_MINUTES,
-        path="/",
-        secure=True,
-        samesite="none",
-    )
+    # access and refresh token creation
+    access_token = await create_access_token({"id": str(existing_user.id), "role": existing_user.role})
+    refresh_token = await create_refresh_token({"id": str(existing_user.id), "role": existing_user.role})
+    
+    access_max_age = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60 
+    refresh_max_age = 14 * 24 * 60 * 60  # 14 days
+
+    set_cookie(response, key="access_token", value=access_token, max_age=access_max_age)
+    set_cookie(response, key="refresh_token", value=refresh_token, max_age=refresh_max_age)
 
     user_response:dict = existing_user.model_dump(exclude=EXCLUDE_FIELDS)
     user_response["id"] = str(existing_user.id)
@@ -173,18 +212,53 @@ async def login_user_dependency(user: Login, response: Response):
     return {"success": True, "message": user_response}
 
 
+async def refresh_access_token_dependency(response: Response, token: dict = Depends(auth_refresh_token)):
+    """
+    Docstring for refresh_access_token_dependency
+    
+    :param response: Description: The Response object to set cookies.
+    :type response: Response
+    :param token: Description: The decoded JWT payload from the refresh token.
+    :type token: dict
+    """
+    user_id = token.get("id")
+
+    existing_user = await Users.get(user_id)
+    if not existing_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    access_token = await create_access_token({"id": str(existing_user.id), "role": existing_user.role})
+
+    access_max_age = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    set_cookie(response, key="access_token", value=access_token, max_age=access_max_age)
+
+    return {"success": True, "message": "Access token refreshed successfully"}
+
+
 async def get_user_logout_dependency(response: Response, token: dict = Depends(authenticate_user)):
-    response.delete_cookie(
-        key="access_token",
-        path="/",
-        secure=True,
-        samesite="none",
-        httponly=True,
-    )
+    """
+    Docstring for get_user_logout_dependency
+    
+    :param response: Description: The Response object to delete cookies.
+    :type response: Response
+    :param token: Description: The decoded JWT payload containing user information.
+    :type token: dict
+    """
+
+    delete_cookie(response, key="access_token")
+    delete_cookie(response, key="refresh_token")
     
     return {"success": True, "message": "User logged out successfully"}
 
 async def update_user_avatar(image:UploadFile=File(...), payload:dict=Depends(authenticate_user)):
+    """
+    Docstring for update_user_avatar
+    
+    :param image: Description: The uploaded avatar image file.
+    :type image: UploadFile
+    :param payload: Description: The decoded JWT payload containing user information.
+    :type payload: dict
+    """
     user_id = payload.get("id")
     user = await Users.get(user_id)
     
@@ -221,14 +295,14 @@ async def update_user_avatar(image:UploadFile=File(...), payload:dict=Depends(au
     finally:
         if temp_path and os.path.exists(temp_path):
             try:
-                os.remove("temp")
-            except Exception as e:
+                os.remove(temp_path)
+            except Exception:
                 pass
 
     if avatar_id:
         try:
             data = await delete_file_from_cloudinary(public_id=avatar_id, resource_type="image")
-        except Exception as e:
+        except Exception:
             pass  
 
 
@@ -241,6 +315,12 @@ async def update_user_avatar(image:UploadFile=File(...), payload:dict=Depends(au
     return {"success": True, "user": user_response}
 
 async def remove_user_avatar(payload:dict=Depends(authenticate_user)):
+    """
+    Docstring for remove_user_avatar
+    
+    :param payload: Description: The decoded JWT payload containing user information.
+    :type payload: dict
+    """
     user_id = payload.get("id")
     user = await Users.get(user_id)
     
@@ -253,8 +333,8 @@ async def remove_user_avatar(payload:dict=Depends(authenticate_user)):
         raise HTTPException(status_code=400, detail="No avatar to remove")
 
     try:
-        data = await delete_file_from_cloudinary(public_id=avatar_id, resource_type="image")
-    except Exception as e:
+        await delete_file_from_cloudinary(public_id=avatar_id, resource_type="image")
+    except Exception:
         raise HTTPException(status_code=500, detail="Unable to delete avatar from cloud storage")  
 
     user.avatarUrl = None

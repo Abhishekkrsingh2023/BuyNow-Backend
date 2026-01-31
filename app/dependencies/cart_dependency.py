@@ -3,24 +3,36 @@ from fastapi import Depends, HTTPException
 from beanie.operators import In
 from beanie import BeanieObjectId
 
-from app.schemas import Users, Products, Carts,CartItem
+from app.schemas import Users, Products, Carts, CartItem
 
 from app.auth_dependency.auth_user import authenticate_user
 from app.utils.current_timestamp import get_current_timestamp
 
 
-
-async def add_to_cart_dependency(cart:CartItem, token: dict = Depends(authenticate_user)):
-    
+async def add_to_cart_dependency(cart: CartItem, token: dict = Depends(authenticate_user)):
     user_id = token.get("id")
     user = await Users.get(user_id)
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     user_cart = await Carts.find_one(Carts.user.id == user.id)
-    
-    # Check if the product already exists in the cart
+
+    # ✅ Create a cart for the user if it doesn't exist yet
+    if not user_cart:
+        user_cart = Carts(
+            user=user,
+            items=[],
+            createdAt=get_current_timestamp(),
+            updatedAt=get_current_timestamp(),
+        )
+        await user_cart.insert()
+
+    # items is always a list
+    if user_cart.items is None:
+        user_cart.items = []
+
+    # Checking if the product already exists in the cart
     for item in user_cart.items:
         if item.productId == cart.productId:
             item.quantity += cart.quantity
@@ -33,6 +45,7 @@ async def add_to_cart_dependency(cart:CartItem, token: dict = Depends(authentica
 
     return {"success": True, "message": "Product added to cart successfully"}
 
+
 async def get_products_in_cart(token: dict = Depends(authenticate_user)):
     user_id = token.get("id")
 
@@ -40,10 +53,8 @@ async def get_products_in_cart(token: dict = Depends(authenticate_user)):
     if not cart or not cart.items:
         return {"success": True, "cart": []}
 
-    # work entirely with ObjectIds
     product_ids = [item.productId for item in cart.items]
 
-    # fetch all products with one query
     products = await Products.find(
         In(Products.id, product_ids)
     ).to_list()
@@ -51,7 +62,6 @@ async def get_products_in_cart(token: dict = Depends(authenticate_user)):
     if not products:
         return {"success": True, "cart": []}
 
-    # map using ObjectId keys (no string conversion)
     product_map = {product.id: product for product in products}
 
     cart_with_products = []
@@ -71,9 +81,7 @@ async def get_products_in_cart(token: dict = Depends(authenticate_user)):
     return {"success": True, "cart": cart_with_products}
 
 
-
 async def remove_from_cart_dependency(product_id: BeanieObjectId, token: dict = Depends(authenticate_user)):
-
     user_id = token.get("id")
 
     cart = Carts.get_pymongo_collection()

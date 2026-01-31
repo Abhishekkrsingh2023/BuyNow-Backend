@@ -6,6 +6,7 @@ from app.dependencies.user_dependency import (
     get_current_user_dependency,
     update_user_dependency,
     get_user_logout_dependency,
+    refresh_access_token_dependency
 )
 
 router = APIRouter(
@@ -23,6 +24,10 @@ async def login_user(user = Depends(login_user_dependency)):
 
 @router.get("/logout",status_code=status.HTTP_201_CREATED)
 async def logout_user(message=Depends(get_user_logout_dependency)):
+    return message
+
+@router.get("/refresh-access-token",status_code=status.HTTP_200_OK)
+async def refresh_access_token(message=Depends(refresh_access_token_dependency)):
     return message
 
 @router.put("/update",status_code=status.HTTP_202_ACCEPTED,description="Update user details")
