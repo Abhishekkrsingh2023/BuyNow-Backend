@@ -15,11 +15,21 @@ from app.schemas import (
 from app.dependencies.user_dependency import get_current_user_dependency
 
 
-async def get_order_details(order: OrderSchema, user=Depends(get_current_user_dependency)):
+async def get_order_details(order: OrderSchema, user_from_db=Depends(get_current_user_dependency)):
+    """
+    Docstring for get_order_details
+    
+    :param order: Description: The order details provided by the user.
+    :type order: OrderSchema
+    :param user_from_db: Description: The current authenticated user details.
+    :type user_from_db: dict
+    """
     razorpay_client = create_razorpay_client()
     order_data = order.model_dump(exclude_unset=True)
 
+    user = user_from_db["user"]
     product_id = order_data['product_id']
+
     # Product matching with database
     product = await Products.get(product_id)
 
@@ -42,7 +52,7 @@ async def get_order_details(order: OrderSchema, user=Depends(get_current_user_de
         "notes": {
             "product_id": f"{product_id}",
             "product_name": f"{product.name}",
-            "user_id": f"{str(user.id)}"
+            "user_id": user["id"]
         }
     }
     try:
@@ -57,7 +67,7 @@ async def get_order_details(order: OrderSchema, user=Depends(get_current_user_de
     address = order.address.model_dump()
     
     new_order = Orders(
-        userId=user.id,
+        userId=BeanieObjectId(user["id"]),
         razorpay_order_id=razorpay_order['id'],
         reciept=receipt,
         product_name=product.name,
@@ -67,12 +77,18 @@ async def get_order_details(order: OrderSchema, user=Depends(get_current_user_de
         subTotalAmt=amount / 100,
         totalAmt=amount / 100,
     )
-    await new_order.insert()
 
+    await new_order.insert()
     return razorpay_order
     
 
 async def verify_payment_signature(data: PaymentVerificationSchema):
+    """
+    Docstring for verify_payment_signature
+    
+    :param data: Description: The payment verification details provided by the user.
+    :type data: PaymentVerificationSchema
+    """
     razorpay_client = create_razorpay_client()
     verify_details = {
         "razorpay_order_id": data.razorpay_order_id,
@@ -83,7 +99,7 @@ async def verify_payment_signature(data: PaymentVerificationSchema):
     try:
         # Razorpay will raise SignatureVerificationError if invalid
         razorpay_client.utility.verify_payment_signature(verify_details)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Payment signature verification failed."

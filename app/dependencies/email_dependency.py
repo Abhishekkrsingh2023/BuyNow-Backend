@@ -1,5 +1,5 @@
 
-from fastapi import BackgroundTasks,HTTPException,Response
+from fastapi import BackgroundTasks,HTTPException
 from app.schemas.login_schema import OTPVerification
 from app.schemas.user_schema import Users
 from app.utils import (
@@ -9,7 +9,7 @@ from app.utils import (
 
 async def send_otp_dependency(email: str,background_tasks: BackgroundTasks):
     """
-    send_message_dependency
+    send_otp_dependency
     
     :param email: email address to send OTP for verification
     :type email: str
@@ -27,7 +27,13 @@ async def send_otp_dependency(email: str,background_tasks: BackgroundTasks):
 
     return {"success": True, "message": "OTP sent to your email address."}
 
-async def verify_user_dependency(otp_verification: OTPVerification, response: Response):
+async def verify_user_dependency(otp_verification: OTPVerification):
+    """
+    Docstring for verify_user_dependency
+    
+    :param otp_verification: Description: The OTPVerification object containing email and OTP.
+    :type otp_verification: OTPVerification
+    """
     user = await Users.find_one(Users.email == otp_verification.email)
 
     if not user:
@@ -42,6 +48,5 @@ async def verify_user_dependency(otp_verification: OTPVerification, response: Re
     user.isVerified = True
     user.verificationCode = None
     await user.save()
-    response.status_code = 200
 
     return {"success": True, "message": "User verified successfully"}
