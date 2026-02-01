@@ -1,3 +1,4 @@
+
 from pydantic import BaseModel, EmailStr, Field
 from typing import Annotated, Optional
 from datetime import datetime
@@ -9,8 +10,7 @@ from beanie import (
 )
 
 from app.utils import get_current_timestamp
-
-
+from app.schemas.address_schema import Address
 
 class Users(Document):
     firstName: Annotated[str, Field(..., min_length=1, max_length=50)]
@@ -18,6 +18,7 @@ class Users(Document):
     email: Annotated[EmailStr, Indexed(unique=True)]
     password: Annotated[str, Field(..., min_length=8)]
 
+    alternateNo: Annotated[Optional[str], Field(default=None, min_length=7, max_length=15, alias="alternateNo")]
     contactNo: Annotated[Optional[str], Field(default=None, min_length=7, max_length=15, alias="contactNumber")]
     role: Annotated[str, Field(default="user", alias="role")]
 
@@ -28,7 +29,7 @@ class Users(Document):
     verificationCode: Annotated[Optional[str], Field(default=None, alias="verificationCode")]
 
     cartId: Annotated[Optional[BeanieObjectId], Field(default=None, alias="cartId")]
-    addressId: Annotated[Optional[BeanieObjectId], Field(default=None, alias="addressId")]
+    address: list[Address] = Field(default_factory=list)
 
     createdAt: Annotated[datetime, Field(default_factory=get_current_timestamp)]
     updatedAt: Annotated[datetime, Field(default_factory=get_current_timestamp)]
@@ -36,15 +37,12 @@ class Users(Document):
     class Settings:
         name = "users"
     
-
-
 class CreateUser(BaseModel):
     firstName: Annotated[str, Field(..., min_length=1, max_length=50, alias="firstName")]
     lastName: Annotated[str, Field(..., min_length=1, max_length=50, alias="lastName")]
     email: Annotated[EmailStr, Field(..., alias="email")]
     password: Annotated[str, Field(..., min_length=8)]
     contactNumber: Annotated[Optional[str], Field(default=None, min_length=7, max_length=15, alias="contactNumber")]
-
 
 class UpdateUser(BaseModel):
     firstName: Annotated[Optional[str], Field(default=None, min_length=1, max_length=50, alias="firstName")]

@@ -5,7 +5,7 @@ from app.dependencies.user_dependency import (
     remove_user_avatar,
     delete_user_dependency,
     update_user_avatar,
-    remove_user_avatar
+    remove_user_avatar,
 )
 
 from app.dependencies.cart_dependency import (
@@ -30,7 +30,6 @@ async def add_to_cart(message = Depends(add_to_cart_dependency)):
 @router.get("/cart",status_code=status.HTTP_200_OK)
 async def get_cart(products = Depends(get_products_in_cart)):
     return products
-
 
 @router.delete("/cart/remove/{product_id}", status_code=status.HTTP_200_OK)
 async def remove_from_cart(message: dict = Depends(remove_from_cart_dependency)):

@@ -20,7 +20,8 @@ from app.auth_dependency import (
 from app.schemas import (
     Users, 
     CreateUser,
-    Addresses,
+    Address,
+    UpdateAddress,
     Carts,
     UpdateUser
 )
@@ -44,8 +45,8 @@ from app.utils import (
     delete_cookie,
 )
 
+from app.constants import USER_EXCLUDE_FIELDS as EXCLUDE_FIELDS
 
-EXCLUDE_FIELDS = ["password", "verificationCode", "_id","cartId","addressId","avatarId"]
 
 
 async def create_user_dependency(user: CreateUser, background_tasks: BackgroundTasks):
@@ -68,13 +69,9 @@ async def create_user_dependency(user: CreateUser, background_tasks: BackgroundT
     new_user = Users(**user.model_dump(by_alias=True), verificationCode=otp)
     await new_user.insert()
 
-    address = Addresses(user=new_user, addresses=[])
     cart = Carts(user=new_user, products=[])
-
     await cart.insert()
-    await address.insert()
 
-    new_user.addressId = address.id
     new_user.cartId = cart.id
     await new_user.save()
 
@@ -88,7 +85,6 @@ async def create_user_dependency(user: CreateUser, background_tasks: BackgroundT
     user_response["id"] = str(new_user.id)
 
     return {"success": True, "user": user_response}
-
 
 
 async def get_current_user_dependency(payload=Depends(authenticate_user)):
@@ -136,6 +132,7 @@ async def update_user_dependency(user_update: UpdateUser, payload:dict=Depends(a
     if "password" in update_values:
         update_values["password"] = await hash_password(update_values["password"])
 
+
     update_values["updatedAt"] = get_current_timestamp()
     await user.update({"$set": update_values})
 
@@ -161,11 +158,6 @@ async def delete_user_dependency(token: dict = Depends(authenticate_user)):
     user = await Users.get(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    # associated data deletion
-    address = await Addresses.find_one(Addresses.userId.id == user.id)
-    if address:
-        await address.delete()
 
     cart = await Carts.find_one(Carts.userId.id == user.id)
     if cart:
@@ -252,7 +244,7 @@ async def get_user_logout_dependency(response: Response, token: dict = Depends(a
 
 async def update_user_avatar(image:UploadFile=File(...), payload:dict=Depends(authenticate_user), background_tasks:BackgroundTasks=None):
     """
-    Docstring for update_user_avatar
+    update_user_avatar
     
     :param image: Description: The uploaded avatar image file.
     :type image: UploadFile

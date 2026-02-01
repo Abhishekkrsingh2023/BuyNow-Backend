@@ -7,7 +7,6 @@ from app.schemas import (
     Users,
     Carts,
     Products,
-    Addresses,
     Orders,
 )
 
@@ -16,7 +15,7 @@ async def get_database() -> AsyncIOMotorClient:
         client = AsyncIOMotorClient(settings.MONGO_URL)
         await init_beanie(
             client[settings.DATABASE_NAME], 
-            document_models=[Users, Carts, Products, Addresses, Orders],
+            document_models=[Users, Carts, Products, Orders],
         )
         return client
     except Exception:

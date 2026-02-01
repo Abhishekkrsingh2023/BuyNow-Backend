@@ -22,7 +22,7 @@ async def get_user_profile(current_user= Depends(get_current_user_dependency)):
 async def login_user(user = Depends(login_user_dependency)):
     return user
 
-@router.get("/logout",status_code=status.HTTP_201_CREATED)
+@router.get("/logout",status_code=status.HTTP_200_OK)
 async def logout_user(message=Depends(get_user_logout_dependency)):
     return message
 

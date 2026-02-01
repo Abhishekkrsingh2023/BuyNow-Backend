@@ -1,35 +1,23 @@
 
-from beanie import (
-    Document,
-    Link, 
-)
+import uuid
+from typing import Optional, Annotated
 from pydantic import BaseModel, Field
-from typing import Optional
-
-from datetime import datetime
-from app.utils import get_current_timestamp
-
-from .user_schema import Users
 
 
 class Address(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    street: Optional[str] = Field(None)
-    city: str = Field(...)
-    state: str = Field(...)
-    country: str = Field(...)
-    zip_code: str = Field(...)
-    is_default: bool = Field(default=False)
+    id: Annotated[str, Field(default_factory=lambda: str(uuid.uuid4()))]
+    street: Annotated[str, Field(..., min_length=1, max_length=100)]
+    city: Annotated[str, Field(..., min_length=1, max_length=50)]
+    state: Annotated[str, Field(..., min_length=1, max_length=50)]
+    zipCode: Annotated[str, Field(..., min_length=4, max_length=10)]
+    country: Annotated[str, Field(..., min_length=1, max_length=50)]
+    isDefault: Annotated[bool, Field(default=False, alias="isDefault")]
 
-
-class Addresses(Document):
-    user: Link["Users"]
-    addresses: list[Address] = Field(default_factory=list)
-
-    createdAt: datetime = Field(default_factory=get_current_timestamp)
-    updatedAt: datetime = Field(default_factory=get_current_timestamp)
-
-    class Settings:
-        name = "addresses"
-    
-
+class UpdateAddress(BaseModel):
+    id: Annotated[str, Field(..., alias="id")]
+    street: Annotated[Optional[str], Field(default=None, min_length=1, max_length=100)]
+    city: Annotated[Optional[str], Field(default=None, min_length=1, max_length=50)]
+    state: Annotated[Optional[str], Field(default=None, min_length=1, max_length=50)]
+    zipCode: Annotated[Optional[str], Field(default=None, min_length=4, max_length=10)]
+    country: Annotated[Optional[str], Field(default=None, min_length=1, max_length=50)]
+    isDefault: Annotated[Optional[bool], Field(default=False, alias="isDefault")]

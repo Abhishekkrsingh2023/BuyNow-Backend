@@ -3,10 +3,6 @@ from app.config.settings import settings
 import cloudinary
 import cloudinary.uploader as uploader
 
-# Import to format the JSON responses
-# ==============================
-import json
-
 # Set configuration parameter: return "https" URLs by setting secure=True  
 # ==============================
 config = cloudinary.config(

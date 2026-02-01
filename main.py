@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.database.connection import get_database
 
-from app.api.api_router import api_router
+from app.api import api_router
 
 
 @asynccontextmanager
@@ -27,9 +27,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+origin_urls = [
+    "http://localhost:5173",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origin_urls,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -10,40 +10,34 @@ from app.utils.current_timestamp import get_current_timestamp
 
 
 async def add_to_cart_dependency(cart: CartItem, token: dict = Depends(authenticate_user)):
-    user_id = token.get("id")
-    user = await Users.get(user_id)
+    user_id = BeanieObjectId(token["id"])
 
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    # Increment quantity if the product already exists
+    update_existing = await Carts.find_one(
+        Carts.user.id == user_id,
+        {"items.productId": cart.productId}
+    ).update(
+        {
+            "$inc": {"items.$.quantity": cart.quantity},
+            "$set": {"updatedAt": get_current_timestamp()}
+        }
+    )
 
-    user_cart = await Carts.find_one(Carts.user.id == user.id)
+    # If matched, quantity was incremented — done
+    if update_existing.matched_count > 0:
+        return {"success": True, "message": "Product quantity updated"}
 
-    # ✅ Create a cart for the user if it doesn't exist yet
-    if not user_cart:
-        user_cart = Carts(
-            user=user,
-            items=[],
-            createdAt=get_current_timestamp(),
-            updatedAt=get_current_timestamp(),
-        )
-        await user_cart.insert()
+    item_to_push = cart.model_dump()
+    # Else push a brand new cart item
+    await Carts.find_one(Carts.user.id == user_id).update(
+        {
+            "$push": {"items": item_to_push},
+            "$set": {"updatedAt": get_current_timestamp()}
+        }
+    )
 
-    # items is always a list
-    if user_cart.items is None:
-        user_cart.items = []
+    return {"success": True, "message": "Product added to cart"}
 
-    # Checking if the product already exists in the cart
-    for item in user_cart.items:
-        if item.productId == cart.productId:
-            item.quantity += cart.quantity
-            break
-    else:
-        user_cart.items.append(cart)
-
-    user_cart.updatedAt = get_current_timestamp()
-    await user_cart.save()
-
-    return {"success": True, "message": "Product added to cart successfully"}
 
 
 async def get_products_in_cart(token: dict = Depends(authenticate_user)):

@@ -19,7 +19,7 @@ async def create_admin_dependency(admin: CreateUser):
     
     admin.password = await hash_password(admin.password)
 
-    new_admin = Users(**admin.model_dump(by_alias=True),role="admin")
+    new_admin = Users(**admin.model_dump(by_alias=True,exclude_unset=True),role="admin")
 
     await new_admin.insert()
 
