@@ -26,7 +26,10 @@ class Settings(BaseSettings):
     RAZORPAY_KEY_SECRET: str = Field(..., env="RAZORPAY_KEY_SECRET")
 
     # Configuration for loading .env
-    model_config = SettingsConfigDict(env_file=".env.dev", env_file_encoding="utf-8")
+    # model_config = SettingsConfigDict(env_file=".env.dev", env_file_encoding="utf-8")
+
+    # Configutation for loading env from environment variables (e.g., in production)
+    model_config = SettingsConfigDict(env_file=None, env_file_encoding="utf-8")
 
 # Load settings
 try:
