@@ -30,4 +30,4 @@ async def create_seller_dependency(seller: CreateUser, background_tasks: Backgro
     seller_response = new_seller.model_dump(exclude=USER_EXCLUDE_FIELDS)
     seller_response["id"] = str(new_seller.id)
 
-    return {"success": True, "message": seller_response}
+    return {"success": True, "seller": seller_response}

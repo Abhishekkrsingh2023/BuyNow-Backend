@@ -1,5 +1,9 @@
 from fastapi import APIRouter, Depends,status
 
+from app.dependencies.order_dependency import (
+    get_orders_dependency,
+    get_order_details_dependency,
+)
 from app.dependencies.user_dependency import (
     create_user_dependency,
     remove_user_avatar,
@@ -30,6 +34,14 @@ async def add_to_cart(message = Depends(add_to_cart_dependency)):
 @router.get("/cart",status_code=status.HTTP_200_OK)
 async def get_cart(products = Depends(get_products_in_cart)):
     return products
+
+@router.get("/orders",status_code=status.HTTP_200_OK)
+async def get_orders(orders = Depends(get_orders_dependency)):
+    return orders
+
+@router.get("/order-details",status_code=status.HTTP_200_OK)
+async def get_order_details(order_details = Depends(get_order_details_dependency)):
+    return order_details
 
 @router.delete("/cart/remove/{product_id}", status_code=status.HTTP_200_OK)
 async def remove_from_cart(message: dict = Depends(remove_from_cart_dependency)):

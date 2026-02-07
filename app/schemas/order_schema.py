@@ -19,7 +19,7 @@ class Orders(Document):
 
     userId: Indexed(BeanieObjectId)  
     razorpay_order_id: Indexed(str, unique=True)
-    reciept: Indexed(str) 
+    receipt: Indexed(str) 
 
     payment_id: Optional[Indexed(str)] = None
 
@@ -51,11 +51,18 @@ class Address(BaseModel):
     is_default: bool = Field(default=False)
 
 
+class OrderingAddress(BaseModel):
+    street: Optional[str] = Field(None)
+    city: str = Field(...)
+    state: str = Field(...)
+    country: str = Field(...)
+    zipCode: str = Field(...)
+
 class OrderSchema(BaseModel):
     product_id: str
     amount: float | None = None
     quantity: int
-    address: Address
+    address: OrderingAddress
 
 
 class PaymentVerificationSchema(BaseModel):

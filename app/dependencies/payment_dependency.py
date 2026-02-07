@@ -15,9 +15,9 @@ from app.schemas import (
 from app.dependencies.user_dependency import get_current_user_dependency
 
 
-async def get_order_details(order: OrderSchema, user_from_db=Depends(get_current_user_dependency)):
+async def create_order_details(order: OrderSchema, user_from_db=Depends(get_current_user_dependency)):
     """
-    Docstring for get_order_details
+    Docstring for create_order_details
     
     :param order: Description: The order details provided by the user.
     :type order: OrderSchema
@@ -69,7 +69,7 @@ async def get_order_details(order: OrderSchema, user_from_db=Depends(get_current
     new_order = Orders(
         userId=BeanieObjectId(user["id"]),
         razorpay_order_id=razorpay_order['id'],
-        reciept=receipt,
+        receipt=receipt,  
         product_name=product.name,
         product_id=str(product_id),
         quantity=quantity,
@@ -79,7 +79,7 @@ async def get_order_details(order: OrderSchema, user_from_db=Depends(get_current
     )
 
     await new_order.insert()
-    return razorpay_order
+    return {"success": True, "order": razorpay_order}
     
 
 async def verify_payment_signature(data: PaymentVerificationSchema):
@@ -95,7 +95,7 @@ async def verify_payment_signature(data: PaymentVerificationSchema):
         "razorpay_payment_id": data.razorpay_payment_id,
         "razorpay_signature": data.razorpay_signature
     }
-    print("Verification details:", verify_details)  # Debugging line
+    # print("Verification details:", verify_details)  # Debugging line
     try:
         # Razorpay will raise SignatureVerificationError if invalid
         razorpay_client.utility.verify_payment_signature(verify_details)
@@ -111,4 +111,5 @@ async def verify_payment_signature(data: PaymentVerificationSchema):
                 "payment_id": data.razorpay_payment_id
             }
         })
-    return {"success": True, "payment_id": data.razorpay_payment_id, "status": "verified"}
+    return {"success": True, "orderId": data.razorpay_order_id}
+

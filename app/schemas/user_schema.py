@@ -19,7 +19,7 @@ class Users(Document):
     password: Annotated[str, Field(..., min_length=8)]
 
     alternateNo: Annotated[Optional[str], Field(default=None, min_length=7, max_length=15, alias="alternateNo")]
-    contactNo: Annotated[Optional[str], Field(default=None, min_length=7, max_length=15, alias="contactNumber")]
+    contactNumber: Annotated[Optional[str], Field(default=None, min_length=7, max_length=15, alias="contactNumber")]
     role: Annotated[str, Field(default="user", alias="role")]
 
     avatarUrl: Annotated[Optional[str], Field(default=None, alias="avatarUrl")]

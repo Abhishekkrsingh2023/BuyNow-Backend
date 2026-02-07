@@ -87,7 +87,7 @@ async def create_user_dependency(user: CreateUser, background_tasks: BackgroundT
     return {"success": True, "user": user_response}
 
 
-async def get_current_user_dependency(payload=Depends(authenticate_user)):
+async def get_current_user_dependency(payload=Depends(authenticate_user))->dict:
     """
     get_current_user_dependency
     
@@ -105,7 +105,7 @@ async def get_current_user_dependency(payload=Depends(authenticate_user)):
     return {"success": True, "user": user_response}
 
 
-async def update_user_dependency(user_update: UpdateUser, payload:dict=Depends(authenticate_user)):
+async def update_user_dependency(user_update: UpdateUser, payload:dict=Depends(authenticate_user))->dict:
     """
     update_user_dependency
     

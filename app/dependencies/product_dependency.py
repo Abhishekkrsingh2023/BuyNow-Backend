@@ -69,6 +69,8 @@ async def create_product_dependency(
     selling_price: float = Form(...),
     mrp: float = Form(...),
     quantity: int = Form(...),
+    category: str = Form(...),
+    subcategory: str = Form(""), # comma-separated string of subcategories
     in_stock: bool = Form(True),
     images: list[UploadFile] = File(...),
     token: dict = Depends(authenticate_user),
@@ -101,7 +103,9 @@ async def create_product_dependency(
         mrp=mrp,
         quantity=quantity,
         in_stock=in_stock,
-        imageUrl=uploaded_images,
+        images=uploaded_images,
+        category=category,
+        subcategory=subcategory.split(",") if subcategory else [],
     )
 
     await new_product.insert()
@@ -128,7 +132,10 @@ async def get_product_dependency(
         prod_dict["id"] = str(prod.id)
         product_responses.append(prod_dict)
 
-    return product_responses
+    return {
+        "success": True,
+        "products": product_responses,
+    }
 
 async def get_random_products_dependency(limit: int = 10):
 
